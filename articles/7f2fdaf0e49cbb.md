@@ -1,5 +1,5 @@
 ---
-title: "そこに仮説はあるんか？〜コードを書く前に立てたい「問い」と、クリティカル・シンキングの話〜"
+title: "そこに理由はあるんか？〜コードを書く前に問いたい「なぜ？」の話〜"
 emoji: "🤔"
 type: "tech" # tech: 技術記事 / idea: アイデア
 topics: ["思考法", "開発手法", "チーム開発"]
@@ -8,42 +8,34 @@ published: false
 
 ## 導入：某CMから始まった問い
 
-某CMの「そこに愛はあるんか？」が、最近頭の中で「仮説」に変換される。
+某CMの「そこに愛はあるんか？」が、最近頭の中で「理由」に変換される。
 
-最近の開発を振り返ると、コードを書くことが価値の本質ではないと感じることが増えた。もしかすると本当に必要なのは「なぜこのコードを書くのか？」という問いと、その裏の仮説なのかもしれない。
+最近の開発を振り返ると、コードを書くことが価値の本質ではないと感じることが増えた。本当に必要なのは「なぜこのコードを書くのか？」という問いなのかもしれない。
 
 ## 課題：実装が"思考停止"になりがち問題
 
 実務では「仕様をそのまま実装する」場面が多い。気づけば、自分も含めて指示通り動くだけになっていることがある。
 
-その結果、なぜその実装が有効だったのかを学べず、改善もできない状態に陥ってしまうことがあるのではないだろうか。
+その結果、なぜその実装が有効だったのかを学べず、改善もできない状態に陥ってしまう。
 
-## 仮説の力：コードを思考に変える
+## 「なぜ？」の力：コードを思考に変える
 
-仮説を立てるとは、「どうすれば目的を達成できるか？」の仮の答えを持つこと。
+「なぜこれを作るのか？」「なぜこの方法を選ぶのか？」
 
-仮説があると：
-- 実装が検証可能になる
+この問いがあると：
+- 実装に意図が生まれる
 - 学びが残る
-- 次回に活かせる知見が蓄積される
+- 次回に活かせる判断基準が蓄積される
 
-これこそが、クリティカル・シンキングの中核の一つだと思う。
+**コードを書くとは、「なぜ？」への答えを実行すること**なのかもしれない。
 
-## クリティカル・シンキングとの接続
+## 3つの「なぜ？」：コードを書く前に自分に問うこと
 
-クリティカル・シンキングとは「目的は何か？前提は正しいか？他に選択肢はあるか？」を問い直すこと。
-
-コードを書く前の仮説立ては、これらをすべて内包している。
-
-つまり、**コードを書くとは、仮説を通じて戦略的な判断を実行すること**なのかもしれない。
-
-## 3つの問い：コードを書く前に自分に問うこと
-
-| 問い | 解説 | 例（軽め） |
+| 問い | 解説 | 例 |
 | --- | --- | --- |
 | ① なぜやる？ | 目的・背景 | KPI改善？CS工数削減？UX向上？ |
-| ② どういう狙い？ | 手段の意図 | バリデーション強化で早期離脱防止など |
-| ③ 何を仮定した？ | 検証視点 | 「多くの離脱は入力ミスが原因」と仮定、など |
+| ② なぜこの方法？ | 手段の理由 | バリデーション強化で早期離脱防止など |
+| ③ なぜそう思う？ | 根拠・前提 | 「多くの離脱は入力ミスが原因」と考える理由は？ |
 
 ## コード例（仮説なし vs 仮説あり）
 
@@ -59,140 +51,41 @@ function UserManagement() {
   const [users, setUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('name');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [showModal, setShowModal] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
-  const [formData, setFormData] = useState({});
-  const [currentPage, setCurrentPage] = useState(1);
-  const [error, setError] = useState(null);
-  const [totalPages, setTotalPages] = useState(1);
-  const [isDeleting, setIsDeleting] = useState(false);
   // まだまだ続く...
 
   // 巨大なfetchロジック
   const fetchUsers = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`/api/users?search=${searchTerm}&status=${statusFilter}&sort=${sortBy}&page=${currentPage}`);
-      const data = await response.json();
-      setUsers(data.users);
-      setTotalPages(data.totalPages);
-    } catch (err) {
-      setError(err.message);
-    }
-    setIsLoading(false);
+    // ローディング、API呼び出し、エラーハンドリング...
+    // 50行のコード
   };
 
   // 複雑な一括操作
   const handleBulkAction = async (action) => {
-    setIsDeleting(true);
-    // 楽観的更新、エラーハンドリング、ローディング状態管理...
-    // 100行のコード...
-    setIsDeleting(false);
+    // 楽観的更新、エラーハンドリング...
+    // 100行のコード
   };
-
-  // フィルタリングとソート
-  const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
-    (statusFilter === 'all' || user.status === statusFilter)
-  ).sort((a, b) => {
-    // 複雑なソートロジック...
-    return a[sortBy].localeCompare(b[sortBy]);
-  });
 
   return (
     <div>
-      {/* 検索とフィルター */}
-      <div>
-        <input 
-          value={searchTerm} 
-          onChange={e => setSearchTerm(e.target.value)}
-          placeholder="ユーザー検索..."
-        />
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-          <option value="all">全て</option>
-          <option value="active">有効</option>
-          <option value="inactive">無効</option>
-        </select>
-        <button 
-          onClick={() => handleBulkAction('activate')}
-          disabled={selectedUsers.length === 0 || isDeleting}
-        >
-          一括有効化
-        </button>
-      </div>
-
-      {/* 巨大なテーブル */}
-      <table>
-        <thead>
-          <tr>
-            <th><input type="checkbox" /* 全選択の複雑なロジック */ /></th>
-            <th onClick={() => setSortBy('name')}>名前 {sortBy === 'name' && '↓'}</th>
-            <th onClick={() => setSortBy('email')}>メール</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {isLoading ? (
-            <tr><td colSpan={4}>読み込み中...</td></tr>
-          ) : (
-            filteredUsers.map(user => (
-              <tr key={user.id}>
-                <td><input type="checkbox" checked={selectedUsers.includes(user.id)} /></td>
-                <td>{user.name}</td>
-                <td>{user.email}</td>
-                <td>
-                  <button onClick={() => { setEditingUser(user); setShowModal(true); }}>編集</button>
-                  <button onClick={() => deleteUser(user.id)}>削除</button>
-                </td>
-              </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-
-      {/* さらに巨大なモーダル */}
-      {showModal && (
-        <div className="modal">
-          <form onSubmit={handleSubmit}>
-            <input 
-              value={formData.name || ''} 
-              onChange={e => setFormData({...formData, name: e.target.value})} 
-            />
-            <input 
-              value={formData.email || ''} 
-              onChange={e => setFormData({...formData, email: e.target.value})} 
-            />
-            {/* 他にも大量のフィールド... */}
-            <button type="submit">保存</button>
-            <button onClick={() => setShowModal(false)}>キャンセル</button>
-          </form>
-        </div>
-      )}
+      {/* 検索、フィルター、テーブル、モーダル... */}
+      {/* 200行の巨大JSX */}
     </div>
   );
 }
 ```
 
-**✅ 仮説ありコード（深い思考プロセス）**
+**✅ 「なぜ？」ありコード（思考プロセスが見える）**
 
-複数の観点から検討して設計：
+「なぜこの設計にしたのか？」が明確な実装：
 
 ```javascript
-// Composition思考プロセス：
-// 1. 責務分離：「検索とテーブル表示は別の関心事では？」
-// 2. 状態の境界：「選択状態は誰が管理すべき？」
-// 3. 再利用性：「この検索コンポーネント、商品管理でも使えそう」
-// 4. テスタビリティ：「この巨大コンポーネント、どうテストする？」
-// 5. パフォーマンス：「1000行のテーブル、全部再レンダリングしてる？」
-
-// 仮説：「Compositionで機能を分離すると、各コンポーネントが
-// "ひとつのことだけをうまくやる"ようになり、
-// バグの原因特定、パフォーマンス最適化、機能追加が
-// 他の部分に影響せずに行える」
+// なぜこう分けたのか？
+// → 「巨大コンポーネントはテストしにくい」
+// → 「機能ごとに分ければ再利用できる」
+// → 「バグが起きたとき、原因特定が簡単」
 ```
 
 **UserManagement.jsx（メインコンテナ）**
@@ -324,29 +217,29 @@ function useSelection() {
 
 ### 違いは何か？
 
-**仮説なしコード**は真似て動かすことが目標だが、**仮説ありコード**は「なぜその選択をしたのか」が明確。
+**思考停止コード**は真似て動かすことが目標だが、**「なぜ？」ありコード**は「なぜその選択をしたのか」が明確。
 
 - どうしてそう書くのが良いか → 明確な理由がある
 - 他の選択肢は無かったのか → 検討した跡が残る  
 - 優先順位は何なのか → トレードオフが見える
 - 思考の基準は何か → チームで共有できる判断軸がある
 
-## 現場での実践：仮説をチームで共有するには
+## 現場での実践：「なぜ？」をチームで共有するには
 
-- PRテンプレに「仮説」の項目を入れる
+- PRテンプレに「なぜこの方法を選んだか」の項目を入れる
 - スプリント計画時に「今回の開発で検証したいことは？」を共有する
-- 実装が終わったあとも、「仮説通りだったか？」をふりかえる場をつくる
+- 実装が終わったあとも、「狙い通りだったか？」をふりかえる場をつくる
 
-## 結論：仮説があるから学べるし、次がある
+## 結論：「なぜ？」があるから学べるし、次がある
 
 コードを書いた成果とは「通った」「動いた」ではなく、「何を学べたか」である。
 
-そしてそれは、仮説を立てないと得られない。
+そしてそれは、「なぜ？」を問わないと得られない。
 
-**「そこに仮説はあるんか？」と自分に問うことは、開発者が思考を止めないための最初の一歩**になるのではないだろうか。
+**「そこに理由はあるんか？」と自分に問うことは、開発者が思考を止めないための最初の一歩**になるのではないだろうか。
 
 ## 締め：今日書いたコードに問いを投げてみて
 
 今日書いたコードを、明日読む自分がどう思うか？
 
-「ちゃんと仮説を持って書いてるな」と思えるなら、それはもう戦略的な開発と言えるかもしれない。
+「ちゃんと理由を持って書いてるな」と思えるなら、それはもう戦略的な開発と言えるかもしれない。
