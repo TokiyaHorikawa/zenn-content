@@ -184,32 +184,19 @@ function UserManagement() {
 ```javascript
 // Composition思考プロセス：
 // 1. 責務分離：「検索とテーブル表示は別の関心事では？」
-//    → UserSearchAndFilter: 検索・フィルタリングのみに専念
-//    → UserTable: データ表示とインタラクションのみに専念
-// 
 // 2. 状態の境界：「選択状態は誰が管理すべき？」
-//    → 複数コンポーネントで共有 = 親で管理
-//    → 個別の内部状態（入力値など）= 各コンポーネントで管理
-//
 // 3. 再利用性：「この検索コンポーネント、商品管理でも使えそう」
-//    → ジェネリックなpropsインターフェース設計
-//    → 具体的なユーザー情報に依存しない作り
-//
 // 4. テスタビリティ：「この巨大コンポーネント、どうテストする？」
-//    → useUserManagement(): APIロジックだけを独立テスト
-//    → UserTable: 表示ロジックだけをモックデータでテスト
-//    → 統合テストと単体テストを分離可能
-//
 // 5. パフォーマンス：「1000行のテーブル、全部再レンダリングしてる？」
-//    → 仮想化コンポーネントで分離 = 最適化が個別に可能
-//    → memo化やuseMemoの適用箇所が明確
 
-// 仮説：
-// 「Compositionで機能を分離すると、各コンポーネントが
+// 仮説：「Compositionで機能を分離すると、各コンポーネントが
 // "ひとつのことだけをうまくやる"ようになり、
 // バグの原因特定、パフォーマンス最適化、機能追加が
 // 他の部分に影響せずに行える」
+```
 
+**UserManagement.jsx（メインコンテナ）**
+```javascript
 // Container: 状態管理とコーディネートのみに専念
 function UserManagement() {
   // 思考：「データ取得ロジックをカスタムフックに隠蔽することで、
@@ -229,20 +216,12 @@ function UserManagement() {
 
   return (
     <div>
-      {/* 思考：「検索は独立した機能なので分離。
-          検索結果の更新方法だけを props で渡す」 */}
       <UserSearchAndFilter onSearch={searchUsers} />
-      
-      {/* 思考：「一括操作は選択状態に依存するが、
-          操作自体のロジックは独立して管理できる」 */}
       <UserBulkActions 
         selectedUserIds={selectedUserIds}
         onBulkAction={bulkUpdateUsers}
         onComplete={clearSelection}
       />
-      
-      {/* 思考：「テーブルは表示とインタラクションに専念。
-          データの取得方法は知らなくて良い」 */}
       <UserTable 
         users={users}
         loading={loading}
@@ -253,7 +232,10 @@ function UserManagement() {
     </div>
   );
 }
+```
 
+**UserSearchAndFilter.jsx（検索・フィルタ）**
+```javascript
 // 検索・フィルタを独立したコンポーネントに
 function UserSearchAndFilter({ onSearch }) {
   // 思考：「検索ロジック（debounce、URLクエリ同期）を
@@ -276,7 +258,10 @@ function UserSearchAndFilter({ onSearch }) {
     </div>
   );
 }
+```
 
+**UserTable.jsx（テーブル表示）**
+```javascript
 // テーブル表示を独立したコンポーネントに
 function UserTable({ users, loading, selectedUserIds, onSelectionChange, onDelete }) {
   // 思考：「大量データの表示最適化（仮想化、memo化）は
@@ -302,7 +287,10 @@ function UserTable({ users, loading, selectedUserIds, onSelectionChange, onDelet
     />
   );
 }
+```
 
+**hooks/useUserManagement.js（ビジネスロジック）**
+```javascript
 // カスタムフック: ビジネスロジックを完全に隠蔽
 function useUserManagement() {
   // 思考：「API呼び出し、キャッシュ戦略、楽観的更新、
@@ -318,7 +306,10 @@ function useUserManagement() {
   
   return { users, loading, error, searchUsers, bulkUpdateUsers, deleteUser };
 }
+```
 
+**hooks/useSelection.js（選択状態管理）**
+```javascript
 // カスタムフック: 横断的関心事の分離
 function useSelection() {
   // 思考：「選択状態の管理は多くの管理画面で共通する機能。
@@ -327,15 +318,6 @@ function useSelection() {
   
   // ...省略
   return { selectedUserIds, toggleSelection, clearSelection };
-}
-
-function useFilters(onSearch) {
-  // 思考：「debounce処理、URLクエリパラメータとの同期など、
-  // 検索UIに共通する複雑なロジックを隠蔽。
-  // コンポーネントは純粋にUIレンダリングに集中できる」
-  
-  // ...省略
-  return { filters, updateFilter, debouncedSearch };
 }
 ```
 
