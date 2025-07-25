@@ -278,45 +278,6 @@ function useTodoLogic() {
 }
 ```
 
-### Rails の例：バリデーションの実装
-
-**🟥 仮説なしのコード**
-
-他のモデルと同じようにpresenceバリデーションを追加しただけ。
-
-```ruby
-class User < ApplicationRecord
-  validates :email, presence: true
-  validates :name, presence: true
-end
-```
-
-**✅ 仮説ありのコード**
-
-「ユーザー登録時のエラーは、具体的で親切なメッセージにすることで離脱率を下げられるのでは？」という仮説を立てて実装。
-
-```ruby
-class User < ApplicationRecord
-  # 仮説：「メールアドレスの形式エラーとDB重複エラーを
-  # 分けて表示することで、ユーザーが次のアクションを取りやすくなる」
-  validates :email, 
-    presence: { message: 'メールアドレスを入力してください' },
-    format: { 
-      with: URI::MailTo::EMAIL_REGEXP, 
-      message: 'メールアドレスの形式が正しくありません' 
-    },
-    uniqueness: { 
-      message: 'このメールアドレスは既に登録されています' 
-    }
-    
-  validates :name, 
-    presence: { message: 'お名前を入力してください' },
-    length: { 
-      minimum: 2, 
-      message: 'お名前は2文字以上で入力してください' 
-    }
-end
-```
 
 ### 違いは何か？
 
