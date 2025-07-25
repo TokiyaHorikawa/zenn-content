@@ -47,85 +47,131 @@ published: false
 
 ## コード例（仮説なし vs 仮説あり）
 
-### React.js の例：責務分離とコンポジション
+### React.js の例：ユーザー管理画面の設計
 
 **🟥 思考停止コピペコード**
 
-「Todoアプリはこんな感じでしょ」的な思考停止実装。他のコードを真似て全ての責務を一つのコンポーネントに詰め込む。
+「管理画面はこんな感じでしょ」的な思考停止実装。全ての機能を一つのコンポーネントに詰め込む。
 
 ```javascript
-function TodoApp() {
-  const [todos, setTodos] = useState([]);
-  const [newTodo, setNewTodo] = useState('');
-  const [filter, setFilter] = useState('all');
+function UserManagement() {
+  // useState地獄の始まり...
+  const [users, setUsers] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('name');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [showModal, setShowModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [formData, setFormData] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
   const [error, setError] = useState(null);
-  const [editingId, setEditingId] = useState(null);
-  const [editingText, setEditingText] = useState('');
+  const [totalPages, setTotalPages] = useState(1);
+  const [isDeleting, setIsDeleting] = useState(false);
+  // まだまだ続く...
 
-  const addTodo = async () => {
+  // 巨大なfetchロジック
+  const fetchUsers = async () => {
     setIsLoading(true);
+    setError(null);
     try {
-      const response = await fetch('/api/todos', {
-        method: 'POST',
-        body: JSON.stringify({ text: newTodo })
-      });
-      const todo = await response.json();
-      setTodos([...todos, todo]);
-      setNewTodo('');
+      const response = await fetch(`/api/users?search=${searchTerm}&status=${statusFilter}&sort=${sortBy}&page=${currentPage}`);
+      const data = await response.json();
+      setUsers(data.users);
+      setTotalPages(data.totalPages);
     } catch (err) {
       setError(err.message);
     }
     setIsLoading(false);
   };
 
-  const filteredTodos = todos.filter(todo => {
-    if (filter === 'completed') return todo.completed;
-    if (filter === 'active') return !todo.completed;
-    return true;
+  // 複雑な一括操作
+  const handleBulkAction = async (action) => {
+    setIsDeleting(true);
+    // 楽観的更新、エラーハンドリング、ローディング状態管理...
+    // 100行のコード...
+    setIsDeleting(false);
+  };
+
+  // フィルタリングとソート
+  const filteredUsers = users.filter(user => 
+    user.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
+    (statusFilter === 'all' || user.status === statusFilter)
+  ).sort((a, b) => {
+    // 複雑なソートロジック...
+    return a[sortBy].localeCompare(b[sortBy]);
   });
 
   return (
     <div>
-      <input 
-        value={newTodo} 
-        onChange={e => setNewTodo(e.target.value)}
-        placeholder="What needs to be done?"
-      />
-      <button onClick={addTodo} disabled={isLoading}>
-        {isLoading ? 'Adding...' : 'Add Todo'}
-      </button>
-      {error && <div className="error">{error}</div>}
-      
+      {/* 検索とフィルター */}
       <div>
-        <button onClick={() => setFilter('all')}>All</button>
-        <button onClick={() => setFilter('active')}>Active</button>
-        <button onClick={() => setFilter('completed')}>Completed</button>
+        <input 
+          value={searchTerm} 
+          onChange={e => setSearchTerm(e.target.value)}
+          placeholder="ユーザー検索..."
+        />
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="all">全て</option>
+          <option value="active">有効</option>
+          <option value="inactive">無効</option>
+        </select>
+        <button 
+          onClick={() => handleBulkAction('activate')}
+          disabled={selectedUsers.length === 0 || isDeleting}
+        >
+          一括有効化
+        </button>
       </div>
 
-      <ul>
-        {filteredTodos.map(todo => (
-          <li key={todo.id}>
-            {editingId === todo.id ? (
-              <>
-                <input 
-                  value={editingText} 
-                  onChange={e => setEditingText(e.target.value)}
-                />
-                <button onClick={() => saveEdit(todo.id)}>Save</button>
-              </>
-            ) : (
-              <>
-                <span onClick={() => toggleTodo(todo.id)}>
-                  {todo.completed ? '✓' : '○'} {todo.text}
-                </span>
-                <button onClick={() => startEdit(todo.id, todo.text)}>Edit</button>
-                <button onClick={() => deleteTodo(todo.id)}>Delete</button>
-              </>
-            )}
-          </li>
-        ))}
-      </ul>
+      {/* 巨大なテーブル */}
+      <table>
+        <thead>
+          <tr>
+            <th><input type="checkbox" /* 全選択の複雑なロジック */ /></th>
+            <th onClick={() => setSortBy('name')}>名前 {sortBy === 'name' && '↓'}</th>
+            <th onClick={() => setSortBy('email')}>メール</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {isLoading ? (
+            <tr><td colSpan={4}>読み込み中...</td></tr>
+          ) : (
+            filteredUsers.map(user => (
+              <tr key={user.id}>
+                <td><input type="checkbox" checked={selectedUsers.includes(user.id)} /></td>
+                <td>{user.name}</td>
+                <td>{user.email}</td>
+                <td>
+                  <button onClick={() => { setEditingUser(user); setShowModal(true); }}>編集</button>
+                  <button onClick={() => deleteUser(user.id)}>削除</button>
+                </td>
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+
+      {/* さらに巨大なモーダル */}
+      {showModal && (
+        <div className="modal">
+          <form onSubmit={handleSubmit}>
+            <input 
+              value={formData.name || ''} 
+              onChange={e => setFormData({...formData, name: e.target.value})} 
+            />
+            <input 
+              value={formData.email || ''} 
+              onChange={e => setFormData({...formData, email: e.target.value})} 
+            />
+            {/* 他にも大量のフィールド... */}
+            <button type="submit">保存</button>
+            <button onClick={() => setShowModal(false)}>キャンセル</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
@@ -136,145 +182,160 @@ function TodoApp() {
 複数の観点から検討して設計：
 
 ```javascript
-// 深い思考プロセス：
-// 1. 責務分離：TodoAppが全部やってていい？presentation/container分けるべき？
-// 2. テスタビリティ：この状態でロジックのテスト書ける？UIと分離できてる？
-// 3. 再利用性：TodoItemの編集ロジック、他でも使えそうだけど取り出せる？
-// 4. パフォーマンス：filteredTodos毎回計算してる、useMemo必要？
-// 5. 状態管理：親で持つべき状態と子で持つべき状態の境界は？
-// 6. アクセシビリティ：キーボード操作、スクリーンリーダー対応は？
-// 7. 運用：エラー処理、ローディング状態の一貫性は？
+// Composition思考プロセス：
+// 1. 責務分離：「検索とテーブル表示は別の関心事では？」
+//    → UserSearchAndFilter: 検索・フィルタリングのみに専念
+//    → UserTable: データ表示とインタラクションのみに専念
+// 
+// 2. 状態の境界：「選択状態は誰が管理すべき？」
+//    → 複数コンポーネントで共有 = 親で管理
+//    → 個別の内部状態（入力値など）= 各コンポーネントで管理
+//
+// 3. 再利用性：「この検索コンポーネント、商品管理でも使えそう」
+//    → ジェネリックなpropsインターフェース設計
+//    → 具体的なユーザー情報に依存しない作り
+//
+// 4. テスタビリティ：「この巨大コンポーネント、どうテストする？」
+//    → useUserManagement(): APIロジックだけを独立テスト
+//    → UserTable: 表示ロジックだけをモックデータでテスト
+//    → 統合テストと単体テストを分離可能
+//
+// 5. パフォーマンス：「1000行のテーブル、全部再レンダリングしてる？」
+//    → 仮想化コンポーネントで分離 = 最適化が個別に可能
+//    → memo化やuseMemoの適用箇所が明確
 
 // 仮説：
-// 「TodoAppは状態管理とビジネスロジックに専念し、
-// 表示ロジックは各コンポーネントに委譲することで、
-// テストしやすく、再利用可能で、責務が明確になる」
+// 「Compositionで機能を分離すると、各コンポーネントが
+// "ひとつのことだけをうまくやる"ようになり、
+// バグの原因特定、パフォーマンス最適化、機能追加が
+// 他の部分に影響せずに行える」
 
-// Container: ビジネスロジックと状態管理
-function TodoApp() {
+// Container: 状態管理とコーディネートのみに専念
+function UserManagement() {
+  // 思考：「データ取得ロジックをカスタムフックに隠蔽することで、
+  // このコンポーネントは純粋にUIのコーディネートに集中できる」
   const {
-    todos,
+    users,
     loading,
     error,
-    addTodo,
-    toggleTodo,
-    deleteTodo,
-    updateTodo
-  } = useTodoLogic(); // カスタムフックで分離
-
-  const [filter, setFilter] = useState('all');
-
-  const filteredTodos = useMemo(() => 
-    todos.filter(todo => {
-      if (filter === 'completed') return todo.completed;
-      if (filter === 'active') return !todo.completed;
-      return true;
-    }),
-    [todos, filter]
-  );
+    searchUsers,
+    bulkUpdateUsers,
+    deleteUser
+  } = useUserManagement();
+  
+  // 思考：「選択状態は複数子コンポーネントで共有されるため、
+  // 最小共通祖先（ここ）で管理するのが自然」
+  const { selectedUserIds, toggleSelection, clearSelection } = useSelection();
 
   return (
     <div>
-      <TodoForm onAddTodo={addTodo} loading={loading} />
-      {error && <ErrorMessage error={error} />}
-      <TodoFilter currentFilter={filter} onFilterChange={setFilter} />
-      <TodoList 
-        todos={filteredTodos}
-        onToggle={toggleTodo}
-        onDelete={deleteTodo}
-        onUpdate={updateTodo}
+      {/* 思考：「検索は独立した機能なので分離。
+          検索結果の更新方法だけを props で渡す」 */}
+      <UserSearchAndFilter onSearch={searchUsers} />
+      
+      {/* 思考：「一括操作は選択状態に依存するが、
+          操作自体のロジックは独立して管理できる」 */}
+      <UserBulkActions 
+        selectedUserIds={selectedUserIds}
+        onBulkAction={bulkUpdateUsers}
+        onComplete={clearSelection}
+      />
+      
+      {/* 思考：「テーブルは表示とインタラクションに専念。
+          データの取得方法は知らなくて良い」 */}
+      <UserTable 
+        users={users}
+        loading={loading}
+        selectedUserIds={selectedUserIds}
+        onSelectionChange={toggleSelection}
+        onDelete={deleteUser}
       />
     </div>
   );
 }
 
-// Presentation: 表示に専念、props経由でデータ受け取り
-function TodoForm({ onAddTodo, loading }) {
-  const [text, setText] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (text.trim()) {
-      onAddTodo(text);
-      setText('');
-    }
-  };
-
+// 検索・フィルタを独立したコンポーネントに
+function UserSearchAndFilter({ onSearch }) {
+  // 思考：「検索ロジック（debounce、URLクエリ同期）を
+  // カスタムフックに隠蔽することで、このコンポーネントは
+  // UIの見た目と基本的なイベントハンドリングに集中できる」
+  const { filters, updateFilter, debouncedSearch } = useFilters(onSearch);
+  
+  // 思考：「商品管理、注文管理でも同じ検索UIが使えるよう、
+  // ユーザー固有の情報に依存しない汎用的な作りにする」
   return (
-    <form onSubmit={handleSubmit}>
+    <div>
       <input 
-        value={text}
-        onChange={e => setText(e.target.value)}
-        placeholder="What needs to be done?"
-        disabled={loading}
+        placeholder="検索..." 
+        onChange={e => updateFilter('search', e.target.value)}
       />
-      <button type="submit" disabled={loading || !text.trim()}>
-        {loading ? 'Adding...' : 'Add Todo'}
-      </button>
-    </form>
+      <select onChange={e => updateFilter('status', e.target.value)}>
+        <option value="all">全て</option>
+        <option value="active">有効</option>
+      </select>
+    </div>
   );
 }
 
-function TodoItem({ todo, onToggle, onDelete, onUpdate }) {
-  const [isEditing, setIsEditing] = useState(false);
-  const [editText, setEditText] = useState(todo.text);
-
-  const handleSave = () => {
-    onUpdate(todo.id, editText);
-    setIsEditing(false);
-  };
-
-  // 思考：編集状態は各アイテムが持つのが自然
-  // なぜなら編集は一時的な状態で、他のコンポーネントには影響しないから
-
-  if (isEditing) {
-    return (
-      <li>
-        <input 
-          value={editText}
-          onChange={e => setEditText(e.target.value)}
-          onBlur={handleSave}
-          onKeyPress={e => e.key === 'Enter' && handleSave()}
-          autoFocus
-        />
-      </li>
-    );
-  }
-
+// テーブル表示を独立したコンポーネントに
+function UserTable({ users, loading, selectedUserIds, onSelectionChange, onDelete }) {
+  // 思考：「大量データの表示最適化（仮想化、memo化）は
+  // このコンポーネント内で完結させる。
+  // 親コンポーネントは表示方法の詳細を知らなくて良い」
+  
+  if (loading) return <div>読み込み中...</div>;
+  
+  // 思考：「VirtualizedTableという抽象化により、
+  // パフォーマンス改善を他の機能に影響なく行える」
   return (
-    <li>
-      <span 
-        onClick={() => onToggle(todo.id)}
-        className={todo.completed ? 'completed' : ''}
-      >
-        {todo.completed ? '✓' : '○'} {todo.text}
-      </span>
-      <button onClick={() => setIsEditing(true)}>Edit</button>
-      <button onClick={() => onDelete(todo.id)}>Delete</button>
-    </li>
-  );
-}
-
-function TodoList({ todos, onToggle, onDelete, onUpdate }) {
-  return (
-    <ul>
-      {todos.map(todo => (
-        <TodoItem 
-          key={todo.id}
-          todo={todo}
-          onToggle={onToggle}
+    <VirtualizedTable
+      data={users}
+      renderRow={(user) => (
+        <UserTableRow 
+          key={user.id}
+          user={user}
+          isSelected={selectedUserIds.includes(user.id)}
+          onSelectionChange={onSelectionChange}
           onDelete={onDelete}
-          onUpdate={onUpdate}
         />
-      ))}
-    </ul>
+      )}
+    />
   );
 }
 
-// カスタムフック: ビジネスロジックを分離してテストしやすく
-function useTodoLogic() {
-  // 実装...
-  // テスト時はこのフックだけをテストすればロジックを検証できる
+// カスタムフック: ビジネスロジックを完全に隠蔽
+function useUserManagement() {
+  // 思考：「API呼び出し、キャッシュ戦略、楽観的更新、
+  // エラーハンドリングなどの複雑なロジックを
+  // UIコンポーネントから完全に隠蔽する。
+  // こうすることで、APIが変わってもUI側は無影響」
+  
+  // 思考：「このフックだけを独立してテストすることで、
+  // ビジネスロジックの正当性を検証できる」
+  
+  // SWR、React Query、Zustandなど好きなライブラリで実装
+  // ...省略
+  
+  return { users, loading, error, searchUsers, bulkUpdateUsers, deleteUser };
+}
+
+// カスタムフック: 横断的関心事の分離
+function useSelection() {
+  // 思考：「選択状態の管理は多くの管理画面で共通する機能。
+  // 汎用的なフックとして切り出すことで、
+  // 商品管理、注文管理でも同じロジックを再利用できる」
+  
+  // ...省略
+  return { selectedUserIds, toggleSelection, clearSelection };
+}
+
+function useFilters(onSearch) {
+  // 思考：「debounce処理、URLクエリパラメータとの同期など、
+  // 検索UIに共通する複雑なロジックを隠蔽。
+  // コンポーネントは純粋にUIレンダリングに集中できる」
+  
+  // ...省略
+  return { filters, updateFilter, debouncedSearch };
 }
 ```
 
