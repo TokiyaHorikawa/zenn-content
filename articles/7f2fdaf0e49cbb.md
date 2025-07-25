@@ -47,53 +47,234 @@ published: false
 
 ## コード例（仮説なし vs 仮説あり）
 
-### React.js の例：状態管理の選択
+### React.js の例：責務分離とコンポジション
 
-**🟥 仮説なしのコード**
+**🟥 思考停止コピペコード**
 
-他のコンポーネントでuseStateを使っているから、とりあえず同じように書いてしまう。
+「Todoアプリはこんな感じでしょ」的な思考停止実装。他のコードを真似て全ての責務を一つのコンポーネントに詰め込む。
 
 ```javascript
-function TodoList() {
+function TodoApp() {
   const [todos, setTodos] = useState([]);
+  const [newTodo, setNewTodo] = useState('');
   const [filter, setFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  
-  // 複雑な状態更新ロジックが散らばる...
-  const addTodo = (text) => {
+  const [editingId, setEditingId] = useState(null);
+  const [editingText, setEditingText] = useState('');
+
+  const addTodo = async () => {
     setIsLoading(true);
-    // 複雑な処理...
-    setTodos(prev => [...prev, newTodo]);
+    try {
+      const response = await fetch('/api/todos', {
+        method: 'POST',
+        body: JSON.stringify({ text: newTodo })
+      });
+      const todo = await response.json();
+      setTodos([...todos, todo]);
+      setNewTodo('');
+    } catch (err) {
+      setError(err.message);
+    }
     setIsLoading(false);
   };
+
+  const filteredTodos = todos.filter(todo => {
+    if (filter === 'completed') return todo.completed;
+    if (filter === 'active') return !todo.completed;
+    return true;
+  });
+
+  return (
+    <div>
+      <input 
+        value={newTodo} 
+        onChange={e => setNewTodo(e.target.value)}
+        placeholder="What needs to be done?"
+      />
+      <button onClick={addTodo} disabled={isLoading}>
+        {isLoading ? 'Adding...' : 'Add Todo'}
+      </button>
+      {error && <div className="error">{error}</div>}
+      
+      <div>
+        <button onClick={() => setFilter('all')}>All</button>
+        <button onClick={() => setFilter('active')}>Active</button>
+        <button onClick={() => setFilter('completed')}>Completed</button>
+      </div>
+
+      <ul>
+        {filteredTodos.map(todo => (
+          <li key={todo.id}>
+            {editingId === todo.id ? (
+              <>
+                <input 
+                  value={editingText} 
+                  onChange={e => setEditingText(e.target.value)}
+                />
+                <button onClick={() => saveEdit(todo.id)}>Save</button>
+              </>
+            ) : (
+              <>
+                <span onClick={() => toggleTodo(todo.id)}>
+                  {todo.completed ? '✓' : '○'} {todo.text}
+                </span>
+                <button onClick={() => startEdit(todo.id, todo.text)}>Edit</button>
+                <button onClick={() => deleteTodo(todo.id)}>Delete</button>
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 ```
 
-**✅ 仮説ありのコード**
+**✅ 仮説ありコード（深い思考プロセス）**
 
-「この画面は状態遷移が複雑になりそうだから、useReducerで一元管理した方が後々メンテしやすいのでは？」という仮説を立てて実装。
+複数の観点から検討して設計：
 
 ```javascript
-// 仮説：「Todo操作は複数の状態を同時に更新することが多く、
-// useReducerで状態遷移を明示的にした方が予期しないバグを防げる」
-function todoReducer(state, action) {
-  switch (action.type) {
-    case 'ADD_TODO_START':
-      return { ...state, isLoading: true, error: null };
-    case 'ADD_TODO_SUCCESS':
-      return { 
-        ...state, 
-        todos: [...state.todos, action.todo],
-        isLoading: false 
-      };
-    // ...
-  }
+// 深い思考プロセス：
+// 1. 責務分離：TodoAppが全部やってていい？presentation/container分けるべき？
+// 2. テスタビリティ：この状態でロジックのテスト書ける？UIと分離できてる？
+// 3. 再利用性：TodoItemの編集ロジック、他でも使えそうだけど取り出せる？
+// 4. パフォーマンス：filteredTodos毎回計算してる、useMemo必要？
+// 5. 状態管理：親で持つべき状態と子で持つべき状態の境界は？
+// 6. アクセシビリティ：キーボード操作、スクリーンリーダー対応は？
+// 7. 運用：エラー処理、ローディング状態の一貫性は？
+
+// 仮説：
+// 「TodoAppは状態管理とビジネスロジックに専念し、
+// 表示ロジックは各コンポーネントに委譲することで、
+// テストしやすく、再利用可能で、責務が明確になる」
+
+// Container: ビジネスロジックと状態管理
+function TodoApp() {
+  const {
+    todos,
+    loading,
+    error,
+    addTodo,
+    toggleTodo,
+    deleteTodo,
+    updateTodo
+  } = useTodoLogic(); // カスタムフックで分離
+
+  const [filter, setFilter] = useState('all');
+
+  const filteredTodos = useMemo(() => 
+    todos.filter(todo => {
+      if (filter === 'completed') return todo.completed;
+      if (filter === 'active') return !todo.completed;
+      return true;
+    }),
+    [todos, filter]
+  );
+
+  return (
+    <div>
+      <TodoForm onAddTodo={addTodo} loading={loading} />
+      {error && <ErrorMessage error={error} />}
+      <TodoFilter currentFilter={filter} onFilterChange={setFilter} />
+      <TodoList 
+        todos={filteredTodos}
+        onToggle={toggleTodo}
+        onDelete={deleteTodo}
+        onUpdate={updateTodo}
+      />
+    </div>
+  );
 }
 
-function TodoList() {
-  const [state, dispatch] = useReducer(todoReducer, initialState);
-  // 状態遷移が明確で、テストも書きやすい
+// Presentation: 表示に専念、props経由でデータ受け取り
+function TodoForm({ onAddTodo, loading }) {
+  const [text, setText] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (text.trim()) {
+      onAddTodo(text);
+      setText('');
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <input 
+        value={text}
+        onChange={e => setText(e.target.value)}
+        placeholder="What needs to be done?"
+        disabled={loading}
+      />
+      <button type="submit" disabled={loading || !text.trim()}>
+        {loading ? 'Adding...' : 'Add Todo'}
+      </button>
+    </form>
+  );
+}
+
+function TodoItem({ todo, onToggle, onDelete, onUpdate }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(todo.text);
+
+  const handleSave = () => {
+    onUpdate(todo.id, editText);
+    setIsEditing(false);
+  };
+
+  // 思考：編集状態は各アイテムが持つのが自然
+  // なぜなら編集は一時的な状態で、他のコンポーネントには影響しないから
+
+  if (isEditing) {
+    return (
+      <li>
+        <input 
+          value={editText}
+          onChange={e => setEditText(e.target.value)}
+          onBlur={handleSave}
+          onKeyPress={e => e.key === 'Enter' && handleSave()}
+          autoFocus
+        />
+      </li>
+    );
+  }
+
+  return (
+    <li>
+      <span 
+        onClick={() => onToggle(todo.id)}
+        className={todo.completed ? 'completed' : ''}
+      >
+        {todo.completed ? '✓' : '○'} {todo.text}
+      </span>
+      <button onClick={() => setIsEditing(true)}>Edit</button>
+      <button onClick={() => onDelete(todo.id)}>Delete</button>
+    </li>
+  );
+}
+
+function TodoList({ todos, onToggle, onDelete, onUpdate }) {
+  return (
+    <ul>
+      {todos.map(todo => (
+        <TodoItem 
+          key={todo.id}
+          todo={todo}
+          onToggle={onToggle}
+          onDelete={onDelete}
+          onUpdate={onUpdate}
+        />
+      ))}
+    </ul>
+  );
+}
+
+// カスタムフック: ビジネスロジックを分離してテストしやすく
+function useTodoLogic() {
+  // 実装...
+  // テスト時はこのフックだけをテストすればロジックを検証できる
 }
 ```
 
