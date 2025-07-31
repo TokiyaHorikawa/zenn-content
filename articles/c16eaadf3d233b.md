@@ -325,7 +325,99 @@ export const UserEditModalContainer = ({ isOpen, user, onClose }) => {
 - ✅ **ロジックの再利用**：Hooks で切り出したロジックを他でも使用可能
 - ✅ **テストの分離**：UI のテストは見た目のみ、ロジックのテストは Hooks のみ
 
-### 実装例とルール
+### 私たちのチームルール
+
+この設計を実践するために、チームで決めたルールを紹介します：
+
+| ファイル種別 | 役割 | 命名例 | やっていいこと | やってはダメなこと |
+|-------------|------|--------|---------------|------------------|
+| `xxx.ui.tsx` | 見た目専用 | `UserForm.ui.tsx` | ・props の表示<br>・UI インタラクション<br>・レイアウト | ・useState<br>・useEffect<br>・API 呼び出し |
+| `xxx.container.tsx` | ロジック統合 | `UserForm.container.tsx` | ・Hooks の呼び出し<br>・UI への props 渡し<br>・Composition | ・直接的な DOM 操作<br>・スタイリング |
+| `useXxx.ts` | ビジネスロジック | `useUserForm.ts` | ・状態管理<br>・API 呼び出し<br>・計算処理 | ・JSX の return<br>・UI 固有の処理 |
+
+#### 重要な原則
+
+**1. UI 層は子の振る舞いを知らない**
+```tsx
+// ❌ 悪い例：子の状態を気にしている
+const PageUI = ({ users }) => {
+  return (
+    <div>
+      <UserList users={users} />
+      {/* UserList の内部状態に依存した処理 */}
+      {users.some(u => u.isEditing) && <div>編集中です</div>}
+    </div>
+  );
+};
+
+// ✅ 良い例：必要な情報は外部から注入
+const PageUI = ({ users, isAnyUserEditing, editingIndicator }) => {
+  return (
+    <div>
+      <UserList users={users} />
+      {editingIndicator} {/* 外部から注入された要素 */}
+    </div>
+  );
+};
+```
+
+**2. Composition で入れ子を避ける**
+```tsx
+// ❌ 悪い例：UI層でコンポーネントを直接入れ子
+const ParentUI = () => {
+  return (
+    <div>
+      <Child1>
+        <Child2>
+          <Child3 />
+        </Child2>
+      </Child1>
+    </div>
+  );
+};
+
+// ✅ 良い例：外部で合成されたものを受け取って配置
+const ParentUI = ({ composedChildElement }) => {
+  return (
+    <div>
+      {composedChildElement} {/* 外部で Child1>Child2>Child3 が合成済み */}
+    </div>
+  );
+};
+
+// Container側で合成
+const ParentContainer = () => {
+  const composedChild = (
+    <Child1Container>
+      <Child2Container>
+        <Child3Container />
+      </Child2Container>
+    </Child1Container>
+  );
+  
+  return (
+    <ParentUI composedChildElement={composedChild} />
+  );
+};
+```
+
+**3. Container は UI とロジックの橋渡し役**
+```tsx
+// Container の責務は「UI に必要な形でデータを渡すこと」
+const UserFormContainer = ({ user }) => {
+  const form = useUserForm(user);
+  const validation = useFormValidation(form.data);
+  
+  return (
+    <UserFormUI
+      {...form.data}
+      {...form.handlers}
+      errors={validation.errors}
+      onSubmit={form.submit}
+    />
+  );
+};
+```
 
 ## この構成で得られる 3 つの効果
 
