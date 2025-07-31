@@ -1,63 +1,68 @@
 ---
-title: "「UIとContainerを分けるのはもう古い？」Hooks時代に再定義された責務分離の実践"
-emoji: ""
+title: "UI/Container分離 × Hooks × Composition で責務を整理してみた話"
+emoji: "🏗️"
 type: "tech" # tech: 技術記事 / idea: アイデア
-topics: ["react", "typescript", "frontend", "hooks", "architecture"]
+topics: ["react", "frontend", "hooks", "architecture", "design-patterns"]
 published: false
 publication_name: globis
 ---
 
-Container-Presenter Pattern や Presentational and Container Components って聞いたことありますか？
-また、Composition って何かイメージできますか？
-最近あまり聞かなくなった言葉ってありますよね。
-今回は古くなってきた？考え方を今の時代に適用していい感じにやれるんじゃね？という記事です。
+最近のプロジェクトで、Reactコンポーネントのテストを書いていて「あれ？」と思うことがありました。
 
-実行犯: Claude Code (sonnet 4)
-計画班: https://x.com/horikawatokiya
+Hooksが普及して、関数コンポーネント内で状態管理やAPI呼び出しができるようになって便利になった一方で、VRT（Visual Regression Test）を書くときや、Storybookでデザインレビューするときに、ちょっとした困りごとが。
 
-Agentic writing で記事を書くことに Try しました。
-※AI による無駄記事量産では無いです。また、ちょっと過剰な表現は「AI さんがやりました」と言わせてもらいます。
-SOW.md を作って、指示して計画を立て、H2, H3 の見出し単位で細かく指示を出すスタイルで書くことでそれっぽく意図どおりになることが分かって良かったです。
-（ちょっと AI が先走りでゴリって書いた感は否めませんが、一旦投稿します。挑戦）
+「見た目だけテストしたいのに、なんでAPIモックの準備が必要なんだろう...？」
 
-## 「UI と Container を分けるのはもう古い」って本当？
+そんなときに思い出したのが、Container/Presentational パターン。
+一時期「もう古い」と言われがちでしたが、Hooksと組み合わせることで、意外と使いやすい形になるんじゃないかと思って試してみました。
 
-React 界隈で一度は聞いたことがあるはず。「Presentational/Container パターンはもう古い」という声。
+その実践記録を共有してみます。
 
-これ、2019 年に React Hooks の提唱者でもある Dan Abramov 自身が[「もう分けなくていい」とコメント](https://medium.com/@dan_abramov/smart-and-dumb-components-7ca2f9a7c7d0)したことがきっかけなんです。
+## Container/Presentational パターンについて振り返ってみる
 
-> "I don't suggest splitting your components like this anymore."
-> (もうこのようにコンポーネントを分割することは推奨しません)
+React を書いている方なら、Presentational/Container パターンについて聞いたことがあるかもしれません。
 
-確かに Hooks の登場で、関数コンポーネント内で状態管理ができるようになった。わざわざ Container と UI を分ける必要はない...
+2015年頃から広まったこのパターンですが、2019年にReact HooksのコアチームメンバーであるDan Abramovが自身のブログ記事で「現在は推奨していない」と[更新したこと](https://medium.com/@dan_abramov/smart-and-dumb-components-7ca2f9a7c7d0)で、使われる機会が減ってきました。
 
-**でも、テストを書こうとしたときに気づくんです。**
+彼が指摘したのは、Hooksの登場により「関数コンポーネントでも状態管理やライフサイクル処理ができるようになったため、パフォーマンス最適化以外の理由で無理に分ける必要がなくなった」ということでした。
 
-例えば、ユーザー編集モーダルの VRT（Visual Regression Test）を追加したいとき。純粋に「見た目が崩れてないか」をテストしたいだけなのに：
+確かにその通りで、Hooksがあれば一つのコンポーネント内で多くのことができるようになりました。
+
+## よく聞く困りごとの例
+
+たとえば、ユーザー編集モーダルのVRT（Visual Regression Test）を追加したい場面を考えてみましょう。
 
 ```tsx
-// これをVRTしたいだけなのに...
+// 見た目だけテストしたい
 <UserEditModal isOpen={true} userId="123" />
 ```
 
-実際はこのコンポーネント内で、ユーザー情報の取得、フォームバリデーション、更新 API 呼び出し、楽観的更新など複数の振る舞いが動いている。
+このコンポーネントは一見シンプルに見えますが、内部では：
+- ユーザー情報のAPI取得
+- フォームバリデーション
+- 更新API呼び出し
+- 楽観的更新
 
-結果として：
+など、複数の処理が動いているとします。
 
-- **VRT したいだけ**なのに、API サーバーのモック、認証状態のセットアップが必要
-- **見た目の確認**をしたいのに、ビジネスロジックのテストデータ準備で時間を取られる
-- 子コンポーネントで起きる副作用を全部制御しないと、テストが不安定になる
+そうすると、純粋に「見た目が崩れていないか」を確認したいだけなのに：
 
-「UI 層が見た目に集中できない」の実害がここにあったんです。
+- APIサーバーのモック設定
+- 認証状態のセットアップ
+- 各種ビジネスロジックのテストデータ準備
 
-## 現実：入れ子地獄で見た目に集中できない UI 層
+これらの準備作業が必要になってしまいます。
 
-Hooks が便利だからって、全部を一つのコンポーネントに詰め込むとどうなるか。実際に見てみましょう：
+Storybookでデザインレビューする場合も同様で、「ちょっとレイアウト確認したいだけなのに、なんでこんなに準備が必要なんだろう...」という声をよく聞きます。
+
+## Hooksを使ったよくある実装例を見てみる
+
+Hooksが便利なので、機能を一つのコンポーネントにまとめることがよくあります。例えばこんな感じです：
 
 ```tsx
 // ユーザー管理ページ
 const UserManagementPage = () => {
-  // 👎 UI層なのに全部のロジックを持ってる
+  // 状態管理、データ取得、ビジネスロジックなどがここに
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -70,7 +75,7 @@ const UserManagementPage = () => {
     <div>
       <SearchBox value={searchQuery} onChange={setSearchQuery} />
       <UserList users={filteredUsers} onEditClick={handleEditClick} />
-      {/* 👎 さらに深い入れ子が始まる */}
+      {/* ここでさらにコンポーネントがネストされる */}
       <UserEditModal
         isOpen={isEditModalOpen}
         user={selectedUser}
@@ -81,14 +86,14 @@ const UserManagementPage = () => {
 };
 ```
 
-一見、何も問題なさそうですが...
+こういう実装はよく見かけますし、動作もします。
 
-### 子コンポーネントでも同じパターンが繰り返される
+### 子コンポーネントでも同様の構造が続く
 
 ```tsx
-// UserEditModal内でも同じことが起きる
+// UserEditModal内でも同様の構造
 const UserEditModal = ({ isOpen, user, onClose }) => {
-  // 👎 またここでもロジックが複雑化
+  // フォームの状態管理、バリデーション、API呼び出しなど
   const [formData, setFormData] = useState({});
   const [validationErrors, setValidationErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -109,12 +114,12 @@ const UserEditModal = ({ isOpen, user, onClose }) => {
 };
 ```
 
-### さらに UserForm 内でも...
+### UserForm 内でも同様に
 
 ```tsx
-// container/ui/container/ui/container/ui... の入れ子地獄
+// 各コンポーネントで同じような構造が繰り返される
 const UserForm = ({ initialData, onSubmit, errors, isSubmitting }) => {
-  // 👎 またここでもロジック...
+  // フォーム各項目の状態管理
   const [name, setName] = useState(initialData.name);
   const [email, setEmail] = useState(initialData.email);
   // ... 省略
@@ -126,36 +131,36 @@ const UserForm = ({ initialData, onSubmit, errors, isSubmitting }) => {
 };
 ```
 
-### 何が問題なのか？
+### この構造で感じたちょっとした不便さ
 
-1. **テストが複雑**：
+このような実装でも十分動作しますが、開発していていくつか気になることがありました：
 
-   - UserManagementPage の VRT を取りたいだけなのに、API モック、データ準備が必要
-   - 子コンポーネントの振る舞いまで制御する必要がある
+**テストを書くとき**：
+- UIの見た目だけテストしたいのに、APIモックの設定が必要
+- 子コンポーネントの動作を制御するための準備が多い
 
-2. **UI 層が見た目に集中できない**：
+**Storybookでデザインレビューするとき**：
+- レイアウトだけ確認したいのに、ビジネスロジックの依存関係を準備する必要
 
-   - ページレイアウトを確認したいのに、ビジネスロジックが邪魔をする
-   - Storybook でデザインレビューするにも、全ての依存関係を準備する必要
+**機能を再利用したいとき**：
+- 同じUIで異なるビジネスロジックを使いたい場合に対応しにくい
 
-3. **再利用が困難**：
-   - 同じような UI でも、ロジックが絡んでいるため別の場面で使いにくい
-   - A/B テストで異なる処理を注入したくても、コンポーネント自体を分岐する必要
+こういったことから、「もしかしてContainer/Presentationalパターンって、今でも使い道あるんじゃない？」と思うようになりました。
 
-この「入れ子地獄」から抜け出すには、どうすればいいのでしょうか？
+## 試してみた提案：UI/Container + Composition + Hooks の組み合わせ
 
-## 解決策：UI/Container + Composition + Hooks の組み合わせ
+こんな困りごとを解決するために、Container/PresentationalパターンをHooksやCompositionと組み合わせることを試してみました。
 
-### 4 つの要素による責務分離
+### 4つの要素で責務を整理するアイデア
 
-先ほどの入れ子地獄を、4 つの要素で整理してみましょう：
+先ほどの実装例を、4つの要素で整理してみることを考えました：
 
-**1. UI 層（.ui.tsx）**：純粋な見た目とインタラクション
-**2. Container 層（.container.tsx）**：データ取得とロジック統合
+**1. UI層（.ui.tsx）**：純粋な見た目とインタラクション
+**2. Container層（.container.tsx）**：データ取得とロジック統合
 **3. Composition**：外部からのコンポーネント合成・注入
 **4. Hooks（useXxx.ts）**：再利用可能なビジネスロジック
 
-### 実際にリファクタリングしてみる
+### 実際に書き換えてみた例
 
 #### 1. Hooks でロジックを切り出し
 
@@ -313,24 +318,22 @@ export const UserEditModalContainer = ({ isOpen, user, onClose }) => {
 };
 ```
 
-### 何が変わったのか？
+### こんな変化がありました
 
-**Before（入れ子地獄）**:
+**以前の実装**：
+- UIとビジネスロジックが同じコンポーネント内に混在
+- コンポーネントが深くネストされる構造
+- テストで子コンポーネントの動作を制御する必要
 
-- 👎 UI 層なのにロジックが混在
-- 👎 container/ui/container/ui の深い入れ子
-- 👎 子コンポーネントの振る舞いに依存したテスト
+**書き換え後**：
+- UI層は純粋にpropsを受け取って表示するだけ
+- Compositionで外部からコンポーネントを注入する構造
+- Hooksで切り出したロジックを他のコンポーネントでも使える
+- UIのテストとロジックのテストを分離できる
 
-**After（4 要素の組み合わせ）**:
+### 実践するために考えたルール
 
-- ✅ **UI 層は純粋な見た目のみ**：props を受け取って表示するだけ
-- ✅ **入れ子構造の解消**：Composition で外部から注入
-- ✅ **ロジックの再利用**：Hooks で切り出したロジックを他でも使用可能
-- ✅ **テストの分離**：UI のテストは見た目のみ、ロジックのテストは Hooks のみ
-
-### 私たちのチームルール
-
-この設計を実践するために、チームで決めたルールを紹介します：
+この設計を試すために、チームで考えたルールを紹介します：
 
 | ファイル種別        | 役割             | 命名例                   | やっていいこと                                              | やってはダメなこと                          |
 | ------------------- | ---------------- | ------------------------ | ----------------------------------------------------------- | ------------------------------------------- |
@@ -338,12 +341,12 @@ export const UserEditModalContainer = ({ isOpen, user, onClose }) => {
 | `xxx.container.tsx` | ロジック統合     | `UserForm.container.tsx` | ・Hooks の呼び出し<br>・UI への props 渡し<br>・Composition | ・直接的な DOM 操作<br>・スタイリング       |
 | `useXxx.ts`         | ビジネスロジック | `useUserForm.ts`         | ・状態管理<br>・API 呼び出し<br>・計算処理                  | ・JSX の return<br>・UI 固有の処理          |
 
-#### 重要な原則
+#### 大切にしたポイント
 
 **1. UI 層は子の振る舞いを知らない**
 
 ```tsx
-// ❌ 悪い例：子の状態を気にしている
+// 以前の実装：子の状態を気にしている
 const PageUI = ({ users }) => {
   return (
     <div>
@@ -354,7 +357,7 @@ const PageUI = ({ users }) => {
   );
 };
 
-// ✅ 良い例：必要な情報は外部から注入
+// 書き換え後：必要な情報は外部から注入
 const PageUI = ({ users, isAnyUserEditing, editingIndicator }) => {
   return (
     <div>
@@ -368,7 +371,7 @@ const PageUI = ({ users, isAnyUserEditing, editingIndicator }) => {
 **2. Composition で入れ子を避ける**
 
 ```tsx
-// ❌ 悪い例：UI層でコンポーネントを直接入れ子
+// 以前の実装：UI層でコンポーネントを直接入れ子
 const ParentUI = () => {
   return (
     <div>
@@ -381,7 +384,7 @@ const ParentUI = () => {
   );
 };
 
-// ✅ 良い例：外部で合成されたものを受け取って配置
+// 書き換え後：外部で合成されたものを受け取って配置
 const ParentUI = ({ composedChildElement }) => {
   return (
     <div>
@@ -451,47 +454,32 @@ const UserFormContainer = ({ user }) => {
 
 **新メンバーの学習コスト**も削減。ファイル命名規則が統一され、責務が明確なので、どこに何があるか分かりやすく、変更箇所も特定しやすくなります。
 
-## まとめ：責務分離 + Composition は今でも強力
+## まとめ：個人的には、まだ使い道があると思っています
 
-「UI と Container を分けるのはもう古い？」
+Container/Presentational パターンについて「もう古い」という話もありますが、個人的には、Hooks や Composition と組み合わせることで、まだまだ現役で使えるパターンだと感じています。
 
-**答えは NO です。**
+今回試してみた構成：
 
-確かに Dan Abramov が 2019 年に「もう分けなくていい」とコメントしたのは事実。でも、それは「Hooks があるから無理に分ける必要はない」という意味であって、「分けること自体が悪い」ではありません。
+**1. UI層（.ui.tsx）**：純粋な見た目とインタラクション
+**2. Container層（.container.tsx）**：データ取得とロジック統合  
+**3. Composition**：外部からのコンポーネント合成・注入
+**4. Hooks（useXxx.ts）**：再利用可能なビジネスロジック
 
-実際に開発現場で起きていることを見てください：
+### 感じたメリット
 
-- VRT を取りたいだけなのに、API モックの準備で時間を取られる
-- UI のデザインレビューなのに、ビジネスロジックの理解が必要
-- 子コンポーネントの振る舞いを制御するために、テストが複雑化
-- A/B テストで異なる処理を試したいのに、コンポーネント全体を分岐する必要
+実際に試してみて感じたのは：
 
-**これらの問題は、Hooks だけでは解決できません。**
+- **テストが書きやすくなった**：UIのテストは見た目だけ、ロジックのテストは Hooks だけに集中できる
+- **Storybook でのデザインレビューが楽になった**：ビジネスロジックの準備なしで UI を確認できる
+- **チーム開発がしやすくなった**：UI 担当とロジック担当で並行作業できる
+- **A/B テストに対応しやすくなった**：同じ UI で異なるロジックを試せる
 
-必要なのは、Hooks の便利さを活かしつつ、適切な責務分離を行うこと。そして重要なのは、単純な分離ではなく **Composition による外部注入** です。
+### Hooks 時代だからこそ
 
-### 現代的な責務分離の 4 要素
+Hooks が便利だからこそ、ついつい一つのコンポーネントに全部詰め込みがちです。でも「できる」ことと「やるべき」ことは別かもしれません。
 
-1. **UI 層（.ui.tsx）**：純粋な見た目とインタラクション
-2. **Container 層（.container.tsx）**：データ取得とロジック統合
-3. **Composition**：外部からのコンポーネント合成・注入
-4. **Hooks（useXxx.ts）**：再利用可能なビジネスロジック
+もちろん、全てのプロジェクトでこの構成が最適というわけではありません。チームの規模、プロジェクトの複雑さ、開発期間など、様々な要因を考慮して選択するのが良いと思います。
 
-この 4 つが組み合わさって、やっと完成します。どれか一つ欠けても、入れ子地獄や責務の曖昧さが残ってしまいます。
+ただ、「テストが書きにくい」「Storybook の準備が大変」といった困りごとがある場合は、一度試してみる価値があるのではないでしょうか。
 
-### Hooks 時代だからこそ、責務分離が重要
-
-Hooks が便利だからこそ、ついつい一つのコンポーネントに全てを詰め込みがち。でも **「できる」と「やるべき」は別** です。
-
-責務分離 + Composition により：
-
-- テストが書きやすく、保守しやすいコードになる
-- チーム開発での並行作業が可能になる
-- UI の変更とロジックの変更を独立して行える
-- 同じ UI で異なるビジネスロジックを試せる
-
-**これは単なる理想論ではなく、実践で効果が証明された現代的なアーキテクチャパターンです。**
-
-Hooks の登場で「古い」とされた Presentational/Container パターンも、Composition という新しい要素と組み合わせることで、より強力で柔軟な設計手法として進化しています。
-
-UI 層が見た目に集中できる。これだけで、開発体験は劇的に向上します。
+UI 層が見た目に集中できるだけで、開発体験はかなり変わります。
