@@ -1,5 +1,5 @@
 ---
-title: "UI/Container分離 × Hooks × Composition で責務を整理してみた話"
+title: "React.js UI/Container分離 × Hooks × Composition で責務を整理してみた話"
 emoji: "🏗️"
 type: "tech" # tech: 技術記事 / idea: アイデア
 topics: ["react", "frontend", "hooks", "architecture", "design-patterns"]
