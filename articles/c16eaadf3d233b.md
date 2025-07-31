@@ -39,9 +39,291 @@ React 界隈で一度は聞いたことがあるはず。「Presentational/Conta
 
 ## 現実：入れ子地獄で見た目に集中できない UI 層
 
+Hooks が便利だからって、全部を一つのコンポーネントに詰め込むとどうなるか。実際に見てみましょう：
+
+```tsx
+// ユーザー管理ページ
+const UserManagementPage = () => {
+  // 👎 UI層なのに全部のロジックを持ってる
+  const [users, setUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  // ... 省略
+
+  // データ取得、検索フィルタリング処理など
+  // ... 省略
+
+  return (
+    <div>
+      <SearchBox value={searchQuery} onChange={setSearchQuery} />
+      <UserList users={filteredUsers} onEditClick={handleEditClick} />
+      {/* 👎 さらに深い入れ子が始まる */}
+      <UserEditModal
+        isOpen={isEditModalOpen}
+        user={selectedUser}
+        onClose={() => setIsEditModalOpen(false)}
+      />
+    </div>
+  );
+};
+```
+
+一見、何も問題なさそうですが...
+
+### 子コンポーネントでも同じパターンが繰り返される
+
+```tsx
+// UserEditModal内でも同じことが起きる
+const UserEditModal = ({ isOpen, user, onClose }) => {
+  // 👎 またここでもロジックが複雑化
+  const [formData, setFormData] = useState({});
+  const [validationErrors, setValidationErrors] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // フォーム送信処理、バリデーションなど
+  // ... 省略
+
+  return (
+    <Modal isOpen={isOpen}>
+      <UserForm
+        initialData={user}
+        onSubmit={handleSubmit}
+        errors={validationErrors}
+        isSubmitting={isSubmitting}
+      />
+    </Modal>
+  );
+};
+```
+
+### さらに UserForm 内でも...
+
+```tsx
+// container/ui/container/ui/container/ui... の入れ子地獄
+const UserForm = ({ initialData, onSubmit, errors, isSubmitting }) => {
+  // 👎 またここでもロジック...
+  const [name, setName] = useState(initialData.name);
+  const [email, setEmail] = useState(initialData.email);
+  // ... 省略
+
+  // バリデーション処理など
+  // ... 省略
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* フォームの中身 */}
+    </form>
+  );
+};
+```
+
+### 何が問題なのか？
+
+1. **テストが複雑**：
+
+   - UserManagementPage の VRT を取りたいだけなのに、API モック、データ準備が必要
+   - 子コンポーネントの振る舞いまで制御する必要がある
+
+2. **UI 層が見た目に集中できない**：
+
+   - ページレイアウトを確認したいのに、ビジネスロジックが邪魔をする
+   - Storybook でデザインレビューするにも、全ての依存関係を準備する必要
+
+3. **再利用が困難**：
+   - 同じような UI でも、ロジックが絡んでいるため別の場面で使いにくい
+   - A/B テストで異なる処理を注入したくても、コンポーネント自体を分岐する必要
+
+この「入れ子地獄」から抜け出すには、どうすればいいのでしょうか？
+
 ## 解決策：UI/Container + Composition + Hooks の組み合わせ
 
 ### 4 つの要素による責務分離
+
+先ほどの入れ子地獄を、4つの要素で整理してみましょう：
+
+**1. UI 層（.ui.tsx）**：純粋な見た目とインタラクション
+**2. Container 層（.container.tsx）**：データ取得とロジック統合
+**3. Composition**：外部からのコンポーネント合成・注入
+**4. Hooks（useXxx.ts）**：再利用可能なビジネスロジック
+
+### 実際にリファクタリングしてみる
+
+#### 1. Hooks でロジックを切り出し
+
+```tsx
+// useUserManagement.ts
+export const useUserManagement = () => {
+  const [users, setUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  // データ取得
+  useEffect(() => {
+    fetchUsers().then(setUsers);
+  }, []);
+  
+  // 検索フィルタリング
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => 
+      user.name.includes(searchQuery) || 
+      user.email.includes(searchQuery)
+    );
+  }, [users, searchQuery]);
+  
+  return {
+    users: filteredUsers,
+    searchQuery,
+    setSearchQuery,
+  };
+};
+
+// useUserEdit.ts
+export const useUserEdit = () => {
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const openEditModal = (user) => {
+    setSelectedUser(user);
+    setIsModalOpen(true);
+  };
+  
+  const closeEditModal = () => {
+    setSelectedUser(null);
+    setIsModalOpen(false);
+  };
+  
+  return {
+    selectedUser,
+    isModalOpen,
+    openEditModal,
+    closeEditModal,
+  };
+};
+```
+
+#### 2. UI 層は純粋な見た目のみ
+
+```tsx
+// UserManagementPage.ui.tsx
+export const UserManagementPageUI = ({
+  users,
+  searchQuery,
+  onSearchChange,
+  onEditClick,
+  editModalElement, // 👈 Composition：外部から注入
+}) => {
+  return (
+    <div>
+      <SearchBox value={searchQuery} onChange={onSearchChange} />
+      <UserList users={users} onEditClick={onEditClick} />
+      {editModalElement} {/* 👈 入れ子を避けて外部から注入 */}
+    </div>
+  );
+};
+
+// UserEditModal.ui.tsx
+export const UserEditModalUI = ({
+  isOpen,
+  onClose,
+  userFormElement, // 👈 Composition：外部から注入
+}) => {
+  return (
+    <Modal isOpen={isOpen} onClose={onClose}>
+      {userFormElement} {/* 👈 フォーム部分も外部から注入 */}
+    </Modal>
+  );
+};
+
+// UserForm.ui.tsx - 完全に純粋なフォーム
+export const UserFormUI = ({
+  name,
+  email,
+  department,
+  onNameChange,
+  onEmailChange,
+  onDepartmentChange,
+  onSubmit,
+  errors,
+  isSubmitting,
+}) => {
+  return (
+    <form onSubmit={onSubmit}>
+      <input 
+        value={name} 
+        onChange={onNameChange}
+        error={errors.name}
+      />
+      <input 
+        value={email} 
+        onChange={onEmailChange}
+        error={errors.email}
+      />
+      {/* ... 省略 */}
+      <button type="submit" disabled={isSubmitting}>
+        更新
+      </button>
+    </form>
+  );
+};
+```
+
+#### 3. Container 層でロジックを統合
+
+```tsx
+// UserManagementPage.container.tsx
+export const UserManagementPage = () => {
+  const userManagement = useUserManagement();
+  const userEdit = useUserEdit();
+  
+  return (
+    <UserManagementPageUI
+      users={userManagement.users}
+      searchQuery={userManagement.searchQuery}
+      onSearchChange={userManagement.setSearchQuery}
+      onEditClick={userEdit.openEditModal}
+      editModalElement={
+        <UserEditModalContainer
+          isOpen={userEdit.isModalOpen}
+          user={userEdit.selectedUser}
+          onClose={userEdit.closeEditModal}
+        />
+      }
+    />
+  );
+};
+
+// UserEditModal.container.tsx
+export const UserEditModalContainer = ({ isOpen, user, onClose }) => {
+  const userForm = useUserForm(user);
+  
+  return (
+    <UserEditModalUI
+      isOpen={isOpen}
+      onClose={onClose}
+      userFormElement={
+        <UserFormUI
+          {...userForm.formData}
+          {...userForm.handlers}
+          errors={userForm.errors}
+          isSubmitting={userForm.isSubmitting}
+        />
+      }
+    />
+  );
+};
+```
+
+### 何が変わったのか？
+
+**Before（入れ子地獄）**:
+- 👎 UI 層なのにロジックが混在
+- 👎 container/ui/container/ui の深い入れ子
+- 👎 子コンポーネントの振る舞いに依存したテスト
+
+**After（4要素の組み合わせ）**:
+- ✅ **UI 層は純粋な見た目のみ**：props を受け取って表示するだけ
+- ✅ **入れ子構造の解消**：Composition で外部から注入
+- ✅ **ロジックの再利用**：Hooks で切り出したロジックを他でも使用可能
+- ✅ **テストの分離**：UI のテストは見た目のみ、ロジックのテストは Hooks のみ
 
 ### 実装例とルール
 
