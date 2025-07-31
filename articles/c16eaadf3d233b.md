@@ -3,11 +3,11 @@ title: "React.js UI/Container分離 × Hooks × Composition で責務を整理�
 emoji: "🏗️"
 type: "tech" # tech: 技術記事 / idea: アイデア
 topics: ["react", "frontend", "hooks", "architecture", "design-patterns"]
-published: false
+published: true
 publication_name: globis
 ---
 
-1年以上前から、チームメンバーの提案でContainer/Presentationalパターンを現代的にアレンジした設計を導入し、徐々に改良を重ねてきました。
+1 年以上前から、チームメンバーの提案で Container/Presentational パターンを現代的にアレンジした設計を導入し、徐々に改良を重ねてきました。
 
 Hooks が普及して、関数コンポーネント内で状態管理や API 呼び出しができるようになって便利になった一方で、いくつかの困りごとがありました。
 
@@ -15,9 +15,9 @@ Hooks が普及して、関数コンポーネント内で状態管理や API 呼
 「このコンポーネント、何の責務を持ってるんだっけ...？」
 「新しいメンバーが入ったとき、どこを変更すればいいか分からない...」
 
-確かにファイル数はHooksだけの時より増えてしまいますが、責務分離により各ファイルが単純になり、特にチーム開発では「単純明快なルール」の方がうまく機能することが分かってきました。
+確かにファイル数は Hooks だけの時より増えてしまいますが、責務分離により各ファイルが単純になり、特にチーム開発では「単純明快なルール」の方がうまく機能することが分かってきました。
 
-そこで、一時期「もう古い」と言われがちだったContainer/Presentational パターンを、Hooksと組み合わせて現代的に活用する設計を実践してきました。
+そこで、一時期「もう古い」と言われがちだった Container/Presentational パターンを、Hooks と組み合わせて現代的に活用する設計を実践してきました。
 
 その実践記録を共有してみます。
 
