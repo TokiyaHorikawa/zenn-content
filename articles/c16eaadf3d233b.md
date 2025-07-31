@@ -7,6 +7,18 @@ published: false
 publication_name: globis
 ---
 
+Container-Presenter Pattern や Presentational and Container Components って聞いたことありますか？
+また、Composition って何かイメージできますか？
+最近あまり聞かなくなった言葉ってありますよね。
+今回は古くなってきた？考え方を今の時代に適用していい感じにやれるんじゃね？という記事です。
+
+実行犯: Claude Code (sonnet 4)
+計画班: https://x.com/horikawatokiya
+
+Agentic writing で記事を書くことに Try しました。
+※AI による無駄記事量産では無いです。また、ちょっと過剰な表現は「AI さんがやりました」と言わせてもらいます。
+SOW.md を作って、指示して計画を立て、H2, H3 の見出し単位で細かく指示を出すスタイルで書くことでそれっぽく意図どおりになることが分かって良かったです。
+
 ## 「UI と Container を分けるのはもう古い」って本当？
 
 React 界隈で一度は聞いたことがあるはず。「Presentational/Container パターンはもう古い」という声。
@@ -109,11 +121,7 @@ const UserForm = ({ initialData, onSubmit, errors, isSubmitting }) => {
   // バリデーション処理など
   // ... 省略
 
-  return (
-    <form onSubmit={handleSubmit}>
-      {/* フォームの中身 */}
-    </form>
-  );
+  return <form onSubmit={handleSubmit}>{/* フォームの中身 */}</form>;
 };
 ```
 
@@ -139,7 +147,7 @@ const UserForm = ({ initialData, onSubmit, errors, isSubmitting }) => {
 
 ### 4 つの要素による責務分離
 
-先ほどの入れ子地獄を、4つの要素で整理してみましょう：
+先ほどの入れ子地獄を、4 つの要素で整理してみましょう：
 
 **1. UI 層（.ui.tsx）**：純粋な見た目とインタラクション
 **2. Container 層（.container.tsx）**：データ取得とロジック統合
@@ -155,20 +163,20 @@ const UserForm = ({ initialData, onSubmit, errors, isSubmitting }) => {
 export const useUserManagement = () => {
   const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // データ取得
   useEffect(() => {
     fetchUsers().then(setUsers);
   }, []);
-  
+
   // 検索フィルタリング
   const filteredUsers = useMemo(() => {
-    return users.filter(user => 
-      user.name.includes(searchQuery) || 
-      user.email.includes(searchQuery)
+    return users.filter(
+      (user) =>
+        user.name.includes(searchQuery) || user.email.includes(searchQuery)
     );
   }, [users, searchQuery]);
-  
+
   return {
     users: filteredUsers,
     searchQuery,
@@ -180,17 +188,17 @@ export const useUserManagement = () => {
 export const useUserEdit = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  
+
   const openEditModal = (user) => {
     setSelectedUser(user);
     setIsModalOpen(true);
   };
-  
+
   const closeEditModal = () => {
     setSelectedUser(null);
     setIsModalOpen(false);
   };
-  
+
   return {
     selectedUser,
     isModalOpen,
@@ -247,16 +255,8 @@ export const UserFormUI = ({
 }) => {
   return (
     <form onSubmit={onSubmit}>
-      <input 
-        value={name} 
-        onChange={onNameChange}
-        error={errors.name}
-      />
-      <input 
-        value={email} 
-        onChange={onEmailChange}
-        error={errors.email}
-      />
+      <input value={name} onChange={onNameChange} error={errors.name} />
+      <input value={email} onChange={onEmailChange} error={errors.email} />
       {/* ... 省略 */}
       <button type="submit" disabled={isSubmitting}>
         更新
@@ -273,7 +273,7 @@ export const UserFormUI = ({
 export const UserManagementPage = () => {
   const userManagement = useUserManagement();
   const userEdit = useUserEdit();
-  
+
   return (
     <UserManagementPageUI
       users={userManagement.users}
@@ -294,7 +294,7 @@ export const UserManagementPage = () => {
 // UserEditModal.container.tsx
 export const UserEditModalContainer = ({ isOpen, user, onClose }) => {
   const userForm = useUserForm(user);
-  
+
   return (
     <UserEditModalUI
       isOpen={isOpen}
@@ -315,11 +315,13 @@ export const UserEditModalContainer = ({ isOpen, user, onClose }) => {
 ### 何が変わったのか？
 
 **Before（入れ子地獄）**:
+
 - 👎 UI 層なのにロジックが混在
 - 👎 container/ui/container/ui の深い入れ子
 - 👎 子コンポーネントの振る舞いに依存したテスト
 
-**After（4要素の組み合わせ）**:
+**After（4 要素の組み合わせ）**:
+
 - ✅ **UI 層は純粋な見た目のみ**：props を受け取って表示するだけ
 - ✅ **入れ子構造の解消**：Composition で外部から注入
 - ✅ **ロジックの再利用**：Hooks で切り出したロジックを他でも使用可能
@@ -329,15 +331,16 @@ export const UserEditModalContainer = ({ isOpen, user, onClose }) => {
 
 この設計を実践するために、チームで決めたルールを紹介します：
 
-| ファイル種別 | 役割 | 命名例 | やっていいこと | やってはダメなこと |
-|-------------|------|--------|---------------|------------------|
-| `xxx.ui.tsx` | 見た目専用 | `UserForm.ui.tsx` | ・props の表示<br>・UI インタラクション<br>・レイアウト | ・useState<br>・useEffect<br>・API 呼び出し |
-| `xxx.container.tsx` | ロジック統合 | `UserForm.container.tsx` | ・Hooks の呼び出し<br>・UI への props 渡し<br>・Composition | ・直接的な DOM 操作<br>・スタイリング |
-| `useXxx.ts` | ビジネスロジック | `useUserForm.ts` | ・状態管理<br>・API 呼び出し<br>・計算処理 | ・JSX の return<br>・UI 固有の処理 |
+| ファイル種別        | 役割             | 命名例                   | やっていいこと                                              | やってはダメなこと                          |
+| ------------------- | ---------------- | ------------------------ | ----------------------------------------------------------- | ------------------------------------------- |
+| `xxx.ui.tsx`        | 見た目専用       | `UserForm.ui.tsx`        | ・props の表示<br>・UI インタラクション<br>・レイアウト     | ・useState<br>・useEffect<br>・API 呼び出し |
+| `xxx.container.tsx` | ロジック統合     | `UserForm.container.tsx` | ・Hooks の呼び出し<br>・UI への props 渡し<br>・Composition | ・直接的な DOM 操作<br>・スタイリング       |
+| `useXxx.ts`         | ビジネスロジック | `useUserForm.ts`         | ・状態管理<br>・API 呼び出し<br>・計算処理                  | ・JSX の return<br>・UI 固有の処理          |
 
 #### 重要な原則
 
 **1. UI 層は子の振る舞いを知らない**
+
 ```tsx
 // ❌ 悪い例：子の状態を気にしている
 const PageUI = ({ users }) => {
@@ -345,7 +348,7 @@ const PageUI = ({ users }) => {
     <div>
       <UserList users={users} />
       {/* UserList の内部状態に依存した処理 */}
-      {users.some(u => u.isEditing) && <div>編集中です</div>}
+      {users.some((u) => u.isEditing) && <div>編集中です</div>}
     </div>
   );
 };
@@ -362,6 +365,7 @@ const PageUI = ({ users, isAnyUserEditing, editingIndicator }) => {
 ```
 
 **2. Composition で入れ子を避ける**
+
 ```tsx
 // ❌ 悪い例：UI層でコンポーネントを直接入れ子
 const ParentUI = () => {
@@ -394,20 +398,19 @@ const ParentContainer = () => {
       </Child2Container>
     </Child1Container>
   );
-  
-  return (
-    <ParentUI composedChildElement={composedChild} />
-  );
+
+  return <ParentUI composedChildElement={composedChild} />;
 };
 ```
 
 **3. Container は UI とロジックの橋渡し役**
+
 ```tsx
 // Container の責務は「UI に必要な形でデータを渡すこと」
 const UserFormContainer = ({ user }) => {
   const form = useUserForm(user);
   const validation = useFormValidation(form.data);
-  
+
   return (
     <UserFormUI
       {...form.data}
@@ -423,27 +426,27 @@ const UserFormContainer = ({ user }) => {
 
 ### 1. テストの分離と効率化
 
-**UI層のテスト**は純粋に見た目のみ。APIモックや子コンポーネントの振る舞い制御が不要になり、VRTやスナップショットテストが簡単に書けます。
+**UI 層のテスト**は純粋に見た目のみ。API モックや子コンポーネントの振る舞い制御が不要になり、VRT やスナップショットテストが簡単に書けます。
 
-**ロジックのテスト**はHooksだけをテスト。UIの描画確認不要で、ビジネスロジックに集中できます。テストの実行速度も大幅に向上。
+**ロジックのテスト**は Hooks だけをテスト。UI の描画確認不要で、ビジネスロジックに集中できます。テストの実行速度も大幅に向上。
 
 ### 2. 開発・デザインレビューの効率化
 
-**Storybookでの開発**が劇的に楽になります。UI層が純粋なので、API接続やビジネスロジックなしでデザインレビューが可能。エラー状態、ローディング状態なども簡単に再現でき、デザイナーとの協業がスムーズです。
+**Storybook での開発**が劇的に楽になります。UI 層が純粋なので、API 接続やビジネスロジックなしでデザインレビューが可能。エラー状態、ローディング状態なども簡単に再現でき、デザイナーとの協業がスムーズです。
 
 ### 3. 柔軟性と再利用性の向上
 
-**A/Bテスト**では同じUIで異なるロジックを注入可能。**環境別処理**も開発環境では詳細ログ、本番環境では最小限のログといった使い分けが簡単です。UIを変更せずにビジネスロジックだけ差し替えられるのは大きなメリット。
+**A/B テスト**では同じ UI で異なるロジックを注入可能。**環境別処理**も開発環境では詳細ログ、本番環境では最小限のログといった使い分けが簡単です。UI を変更せずにビジネスロジックだけ差し替えられるのは大きなメリット。
 
 ### 4. 複雑なビジネスロジックの柔軟な構築
 
-**複数のHooksの組み合わせ**により、フォーム処理、バリデーション、権限管理、監査ログなどを組み合わせた複雑な処理も整理して構築できます。各Hooksが独立しているため、組み合わせパターンも自由自在。
+**複数の Hooks の組み合わせ**により、フォーム処理、バリデーション、権限管理、監査ログなどを組み合わせた複雑な処理も整理して構築できます。各 Hooks が独立しているため、組み合わせパターンも自由自在。
 
 ### 5. チーム開発の効率化
 
-**並行開発**が可能に。フロントエンドエンジニアはUI層、バックエンドエンジニアはHooks内のAPI連携、デザイナーはStorybookでのUIレビューを同時進行できます。
+**並行開発**が可能に。フロントエンドエンジニアは UI 層、バックエンドエンジニアは Hooks 内の API 連携、デザイナーは Storybook での UI レビューを同時進行できます。
 
-**コードレビュー**も効率化。UIの変更は見た目のみ、ロジックの変更はビジネスロジックのみに集中してレビューできるため、レビューポイントが絞りやすくなります。
+**コードレビュー**も効率化。UI の変更は見た目のみ、ロジックの変更はビジネスロジックのみに集中してレビューできるため、レビューポイントが絞りやすくなります。
 
 **新メンバーの学習コスト**も削減。ファイル命名規則が統一され、責務が明確なので、どこに何があるか分かりやすく、変更箇所も特定しやすくなります。
 
@@ -469,7 +472,7 @@ const UserFormContainer = ({ user }) => {
 ### 現代的な責務分離の 4 要素
 
 1. **UI 層（.ui.tsx）**：純粋な見た目とインタラクション
-2. **Container 層（.container.tsx）**：データ取得とロジック統合  
+2. **Container 層（.container.tsx）**：データ取得とロジック統合
 3. **Composition**：外部からのコンポーネント合成・注入
 4. **Hooks（useXxx.ts）**：再利用可能なビジネスロジック
 
@@ -480,8 +483,9 @@ const UserFormContainer = ({ user }) => {
 Hooks が便利だからこそ、ついつい一つのコンポーネントに全てを詰め込みがち。でも **「できる」と「やるべき」は別** です。
 
 責務分離 + Composition により：
+
 - テストが書きやすく、保守しやすいコードになる
-- チーム開発での並行作業が可能になる  
+- チーム開発での並行作業が可能になる
 - UI の変更とロジックの変更を独立して行える
 - 同じ UI で異なるビジネスロジックを試せる
 
