@@ -18,6 +18,7 @@ Container-Presenter Pattern や Presentational and Container Components って�
 Agentic writing で記事を書くことに Try しました。
 ※AI による無駄記事量産では無いです。また、ちょっと過剰な表現は「AI さんがやりました」と言わせてもらいます。
 SOW.md を作って、指示して計画を立て、H2, H3 の見出し単位で細かく指示を出すスタイルで書くことでそれっぽく意図どおりになることが分かって良かったです。
+（ちょっと AI が先走りでゴリって書いた感は否めませんが、一旦投稿します。挑戦）
 
 ## 「UI と Container を分けるのはもう古い」って本当？
 
