@@ -344,11 +344,13 @@ export const UserEditModalContainer = ({ isOpen, user, onClose }) => {
 
 この設計を試すために、チームで考えたルールを紹介します：
 
-| ファイル種別        | 役割             | 命名例                   | やっていいこと                                              | やってはダメなこと                          |
-| ------------------- | ---------------- | ------------------------ | ----------------------------------------------------------- | ------------------------------------------- |
-| `xxx.ui.tsx`        | 見た目専用       | `UserForm.ui.tsx`        | ・props の表示<br>・UI インタラクション<br>・レイアウト     | ・useState<br>・useEffect<br>・API 呼び出し |
-| `xxx.container.tsx` | ロジック統合     | `UserForm.container.tsx` | ・Hooks の呼び出し<br>・UI への props 渡し<br>・Composition | ・直接的な DOM 操作<br>・スタイリング       |
-| `useXxx.ts`         | ビジネスロジック | `useUserForm.ts`         | ・状態管理<br>・API 呼び出し<br>・計算処理                  | ・JSX の return<br>・UI 固有の処理          |
+| ファイル種別        | 役割             | 命名例                   | やっていいこと                                              | やってはダメなこと                                  |
+| ------------------- | ---------------- | ------------------------ | ----------------------------------------------------------- | --------------------------------------------------- |
+| `xxx.ui.tsx`        | 見た目専用       | `UserForm.ui.tsx`        | ・props の表示<br>・UI インタラクション<br>・レイアウト     | ・~~useState~~<br>・~~useEffect~~<br>・API 呼び出し |
+| `xxx.container.tsx` | ロジック統合     | `UserForm.container.tsx` | ・Hooks の呼び出し<br>・UI への props 渡し<br>・Composition | ・直接的な DOM 操作<br>・スタイリング               |
+| `useXxx.ts`         | ビジネスロジック | `useUserForm.ts`         | ・状態管理<br>・API 呼び出し<br>・計算処理                  | ・JSX の return<br>・UI 固有の処理                  |
+
+※ ui 層では「見た目に集中する」けど、やってはダメなことのラインがまだ定まった居ない。react-hook-from など、どこの責務かすごく悩みますね。
 
 #### 大切にしたポイント
 
