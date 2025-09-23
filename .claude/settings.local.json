@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:webreflection.medium.com)",
+      "WebFetch(domain:sdust.dev)",
+      "WebFetch(domain:www.singlestore.com)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
